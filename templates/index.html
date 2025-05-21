@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<head>
+    <title>TFSA Portfolio Performance</title>
+</head>
+<body>
+    <h1>TFSA Portfolio Performance</h1>
+    <p><strong>Current Portfolio Value:</strong> ${{ current_value }}</p>
+    <p><strong>Growth Since Initial Investment:</strong> {{ growth_percent }}%</p>
+    <h2>Portfolio Value Plot</h2>
+    <img src="{{ url_for('plot_png') }}" alt="Portfolio Value Plot">
+</body>
+</html>
+
