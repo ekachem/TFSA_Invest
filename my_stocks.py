@@ -16,6 +16,8 @@ def get_portfolio_data():
         "XEG.TO": {"shares": 6.5231, "buy_price": 15.33},
         "XGRO.TO": {"shares": 6, "buy_price": 31.31},
         "XEQT.TO": {"shares": 10, "buy_price": 34.94},
+        "CNQ.TO": {"shares": 10, "buy_price": 42.88},
+        "WCP.TO": {"shares": 64, "buy_price": 8.90},
     }
 
     unlisted_stock = 24.00
