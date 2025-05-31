@@ -12,12 +12,15 @@ def get_portfolio_data():
         "ENB.TO": {"shares": 4, "buy_price": 62.60},
         "LUN.TO": {"shares": 42, "buy_price": 12.52},
         "VCN.TO": {"shares": 6, "buy_price": 53.46},
-        "VFV.TO": {"shares": 0.5603, "buy_price": 140.01},
-        "XEG.TO": {"shares": 6.5231, "buy_price": 15.33},
+        "VFV.TO": {"shares": 4.0209, "buy_price": 143.86},
+        "XEG.TO": {"shares": 35.5231, "buy_price": 16.35},
         "XGRO.TO": {"shares": 6, "buy_price": 31.31},
         "XEQT.TO": {"shares": 10, "buy_price": 34.94},
         "CNQ.TO": {"shares": 10, "buy_price": 42.88},
+        "VUN.TO": {"shares": 0.8173, "buy_price": 108.97},
         "WCP.TO": {"shares": 64, "buy_price": 8.90},
+        "FFU.V": {"shares": 291, "buy_price": 0.0676},
+        "KDOZ.V": {"shares": 35, "buy_price": 0.3766},
     }
 
     unlisted_stock = 24.00
