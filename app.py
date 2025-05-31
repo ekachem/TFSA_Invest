@@ -14,16 +14,16 @@ def index():
 
 @app.route("/plot.png")
 def plot_png():
-    portfolio_value, initial_value, latest_value, growth = get_portfolio_data()
+    portfolio_value, initial_value, latest_value, growth, years_held = get_portfolio_data()
 
-    target_5 = initial_value * 1.05
-    target_10 = initial_value * 1.10
+    target_5 = initial_value * 1.05 * years_held
+    #target_10 = initial_value * 1.10
 
     # Plotting
     fig, ax = plt.subplots(figsize=(10, 5))
     portfolio_value.plot(ax=ax, label="Portfolio Value", linewidth=2)
-    ax.axhline(y=target_5, color='green', linestyle='--', label='Target +5%')
-    ax.axhline(y=target_10, color='blue', linestyle='--', label='Target +10%')
+    ax.axhline(y=target_5, color='red', linestyle='--', label='5% FD')
+    #ax.axhline(y=target_10, color='blue', linestyle='--', label='Target +10%')
     ax.axhline(y=latest_value, color='cyan', linestyle='--', label=f'Growth: {growth:.2f}%')
 
     ax.set_title("TFSA Portfolio Value Over Time")

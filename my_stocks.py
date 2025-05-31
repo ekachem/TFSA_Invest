@@ -41,5 +41,8 @@ def get_portfolio_data():
     latest_value = portfolio_value.iloc[-1]
     growth = 100.0 * (latest_value - initial_value) / initial_value
 
-    return portfolio_value, initial_value, latest_value, growth
+    days_held = (datetime.now() - datetime.strptime(start_date, "%Y-%m-%d")).days
+    years_held = days_held / 365.0
+
+    return portfolio_value, initial_value, latest_value, growth, years_held
 
