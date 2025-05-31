@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    portfolio_value, initial_value, latest_value, growth = get_portfolio_data()
+    portfolio_value, initial_value, latest_value, growth, years_held = get_portfolio_data()
     return render_template("index.html",
                            current_value=round(latest_value, 2),
                            growth_percent=round(growth, 2))
