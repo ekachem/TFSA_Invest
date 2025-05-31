@@ -23,7 +23,7 @@ def get_portfolio_data():
         "KDOZ.V": {"shares": 35, "buy_price": 0.3766},
     }
 
-    unlisted_stock = 24.00
+    unlisted_stock = 0.00
     start_date = "2025-05-01"
     end_date = datetime.now().strftime("%Y-%m-%d")
 
