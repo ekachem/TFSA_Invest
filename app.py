@@ -16,7 +16,7 @@ def index():
 def plot_png():
     portfolio_value, initial_value, latest_value, growth, years_held = get_portfolio_data()
 
-    target_5 = initial_value * 1.05 * years_held
+    target_5 = initial_value * (1.0 + 0.05 * years_held)
     #target_10 = initial_value * 1.10
 
     # Plotting
