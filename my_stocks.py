@@ -3,45 +3,54 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 
-def get_portfolio_data():
-    portfolio = {
-        "BB.TO": {"shares": 5, "buy_price": 5.46},
-        "BNS.TO": {"shares": 3, "buy_price": 70.50},
-        "DOL.TO": {"shares": 1, "buy_price": 168.19},
-        "SHOP.TO": {"shares": 2, "buy_price": 127.00},
-        "ENB.TO": {"shares": 4, "buy_price": 62.60},
-        "LUN.TO": {"shares": 42, "buy_price": 12.52},
-        "VCN.TO": {"shares": 6, "buy_price": 53.46},
-        "VFV.TO": {"shares": 4.0209, "buy_price": 143.86},
-        "XEG.TO": {"shares": 35.5231, "buy_price": 16.35},
-        "XGRO.TO": {"shares": 6, "buy_price": 31.31},
-        "XEQT.TO": {"shares": 10, "buy_price": 34.94},
-        "CNQ.TO": {"shares": 10, "buy_price": 42.88},
-        "VUN.TO": {"shares": 0.8173, "buy_price": 108.97},
-        "WCP.TO": {"shares": 64, "buy_price": 8.90},
-        "FFU.V": {"shares": 291, "buy_price": 0.0676},
-        "KDOZ.V": {"shares": 35, "buy_price": 0.3766},
-    }
 
-    unlisted_stock = 0.00
-    start_date = "2025-05-01"
+def get_portfolio_data(csv_file='portfolio.csv'):
+    # Read portfolio purchase info
+    df = pd.read_csv(csv_file, parse_dates=['date'])
+
+    start_date = df['date'].min().strftime('%Y-%m-%d')
     end_date = datetime.now().strftime("%Y-%m-%d")
 
-    tickers = list(portfolio.keys())
+    tickers = df['ticker'].unique().tolist()
     data = yf.download(tickers, start=start_date, end=end_date)['Close']
     if isinstance(data, pd.Series):
         data = data.to_frame()
+    data.index = pd.to_datetime(data.index)  # 👈 This line fixes the type mismatch
+    # Ensure we have today's row in the data
+    today = pd.Timestamp(datetime.now().date())
+    if today not in data.index:
+        data.loc[today] = pd.Series([float('nan')] * len(data.columns), index=data.columns)
 
-    portfolio_value = pd.Series(unlisted_stock, index=data.index)
-    for ticker, info in portfolio.items():
-        if ticker in data.columns:
-            portfolio_value += data[ticker] * info['shares']
+    # Make sure index stays datetime type
+    data.index = pd.to_datetime(data.index)
 
-    initial_value = sum(info["shares"] * info["buy_price"] for info in portfolio.values()) + unlisted_stock
+    # Append real-time prices using .info for each ticker
+    for ticker in tickers:
+        try:
+            ticker_obj = yf.Ticker(ticker)
+            live_price = ticker_obj.info.get("regularMarketPrice")
+            if live_price is not None:
+                data.at[today, ticker] = live_price
+        except Exception as e:
+            print(f"Failed to fetch price for {ticker}: {e}")
+
+    # Compute portfolio value over time
+    portfolio_value = pd.Series(0.0, index=data.index)
+
+    for _, row in df.iterrows():
+        ticker = row['ticker']
+        shares = row['shares']
+        purchase_date = row['date']
+        if ticker not in data.columns:
+            continue
+        mask = data.index >= purchase_date
+        portfolio_value[mask] += data.loc[mask, ticker] * shares
+
+    initial_value = (df['shares'] * df['buy_price']).sum()
     latest_value = portfolio_value.iloc[-1]
     growth = 100.0 * (latest_value - initial_value) / initial_value
 
-    days_held = (datetime.now() - datetime.strptime(start_date, "%Y-%m-%d")).days
+    days_held = (datetime.now() - df['date'].min()).days
     years_held = days_held / 365.0
 
     return portfolio_value, initial_value, latest_value, growth, years_held
