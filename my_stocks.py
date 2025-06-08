@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 
-
 def get_portfolio_data(csv_file='portfolio.csv'):
     # Read portfolio purchase info
     df = pd.read_csv(csv_file, parse_dates=['date'])
@@ -15,16 +14,15 @@ def get_portfolio_data(csv_file='portfolio.csv'):
     data = yf.download(tickers, start=start_date, end=end_date)['Close']
     if isinstance(data, pd.Series):
         data = data.to_frame()
-    data.index = pd.to_datetime(data.index)  # 👈 This line fixes the type mismatch
-    # Ensure we have today's row in the data
+    data.index = pd.to_datetime(data.index)
+
+    # Ensure today's row is present
     today = pd.Timestamp(datetime.now().date())
     if today not in data.index:
         data.loc[today] = pd.Series([float('nan')] * len(data.columns), index=data.columns)
-
-    # Make sure index stays datetime type
     data.index = pd.to_datetime(data.index)
 
-    # Append real-time prices using .info for each ticker
+    # Append live prices
     for ticker in tickers:
         try:
             ticker_obj = yf.Ticker(ticker)
@@ -34,24 +32,32 @@ def get_portfolio_data(csv_file='portfolio.csv'):
         except Exception as e:
             print(f"Failed to fetch price for {ticker}: {e}")
 
-    # Compute portfolio value over time
+    # Build portfolio value over time
     portfolio_value = pd.Series(0.0, index=data.index)
+    initial_value_series = pd.Series(0.0, index=data.index)
 
     for _, row in df.iterrows():
         ticker = row['ticker']
         shares = row['shares']
+        buy_price = row['buy_price']
         purchase_date = row['date']
+
         if ticker not in data.columns:
             continue
+
         mask = data.index >= purchase_date
         portfolio_value[mask] += data.loc[mask, ticker] * shares
+        initial_value_series[mask] += shares * buy_price
 
-    initial_value = (df['shares'] * df['buy_price']).sum()
+    # Calculate % growth over time
+    growth_series = 100.0 * (portfolio_value - initial_value_series) / initial_value_series
+
+    # Current values
     latest_value = portfolio_value.iloc[-1]
-    growth = 100.0 * (latest_value - initial_value) / initial_value
+    initial_value = initial_value_series.iloc[-1]
+    growth = growth_series.iloc[-1]
 
     days_held = (datetime.now() - df['date'].min()).days
     years_held = days_held / 365.0
 
-    return portfolio_value, initial_value, latest_value, growth, years_held
-
+    return growth_series, initial_value, latest_value, growth, years_held
