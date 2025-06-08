@@ -60,4 +60,29 @@ def get_portfolio_data(csv_file='portfolio.csv'):
     days_held = (datetime.now() - df['date'].min()).days
     years_held = days_held / 365.0
 
-    return growth_series, initial_value, latest_value, growth, years_held
+    # --- Compute daily investment fraction ---
+    daily_investment = df.copy()
+    daily_investment['amount'] = daily_investment['shares'] * daily_investment['buy_price']
+    daily_investment = daily_investment.groupby('date')['amount'].sum()
+
+    total_investment = daily_investment.sum()
+    investment_fraction = daily_investment / total_investment
+
+    investment_series = pd.Series(0.0, index=portfolio_value.index)
+    for date, frac in investment_fraction.items():
+        if date in investment_series.index:
+            investment_series.at[date] = frac
+
+    max_growth = growth_series.max()
+    investment_scaled = investment_series * (max_growth / investment_series.max())
+    # --- Compute daily fixed deposit-style target growth ---
+    start_date = growth_series.index.min()
+    days = (growth_series.index - start_date).days
+    target_growth_series = pd.Series((5.0 / 365.0) * days, index=growth_series.index)
+
+
+    #return growth_series, initial_value, latest_value, growth, years_held
+    #return growth_series, initial_value, latest_value, growth, years_held, investment_scaled
+    return growth_series, initial_value, latest_value, growth, years_held, investment_scaled, target_growth_series
+
+
