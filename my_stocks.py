@@ -1,10 +1,11 @@
-# my_stocks.py
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+from collections import Counter
+
+TFSA_LIMIT = 7000  # hardcoded for now
 
 def get_portfolio_data(csv_file='portfolio.csv'):
-    # Read portfolio purchase info
     df = pd.read_csv(csv_file, parse_dates=['date'])
 
     start_date = df['date'].min().strftime('%Y-%m-%d')
@@ -16,73 +17,129 @@ def get_portfolio_data(csv_file='portfolio.csv'):
         data = data.to_frame()
     data.index = pd.to_datetime(data.index)
 
-    # Ensure today's row is present
     today = pd.Timestamp(datetime.now().date())
     if today not in data.index:
         data.loc[today] = pd.Series([float('nan')] * len(data.columns), index=data.columns)
-    data.index = pd.to_datetime(data.index)
 
-    # Append live prices
     for ticker in tickers:
         try:
-            ticker_obj = yf.Ticker(ticker)
-            live_price = ticker_obj.info.get("regularMarketPrice")
+            t = yf.Ticker(ticker)
+            live_price = t.info.get('regularMarketPrice')
             if live_price is not None:
                 data.at[today, ticker] = live_price
-        except Exception as e:
-            print(f"Failed to fetch price for {ticker}: {e}")
+        except:
+            pass
 
-    # Build portfolio value over time
     portfolio_value = pd.Series(0.0, index=data.index)
     initial_value_series = pd.Series(0.0, index=data.index)
+
+    holdings = []
+    dividend_income = []
+    sector_counter = Counter()
+    total_contributed = 0.0
 
     for _, row in df.iterrows():
         ticker = row['ticker']
         shares = row['shares']
         buy_price = row['buy_price']
-        purchase_date = row['date']
+        date = row['date']
+        total_contributed += shares * buy_price
 
-        if ticker not in data.columns:
+        if ticker in data.columns:
+            mask = data.index >= date
+            portfolio_value[mask] += data.loc[mask, ticker] * shares
+            initial_value_series[mask] += shares * buy_price
+
+        try:
+            t = yf.Ticker(ticker)
+            current_price = t.info.get("regularMarketPrice", 0)
+            change_percent = 100 * (current_price - buy_price) / buy_price if buy_price else 0
+            sector = t.info.get("sector", "Unknown")
+            sector_counter[sector] += shares * buy_price
+            holdings.append({
+                "ticker": ticker,
+                "shares": shares,
+                "buy_price": round(buy_price, 2),
+                "current_price": round(current_price, 2),
+                "change_percent": round(change_percent, 2)
+            })
+
+            rate = t.info.get("dividendRate")
+            if rate:
+                income = round(rate * shares, 2)
+                dividend_income.append({
+                    "ticker": ticker,
+                    "shares": shares,
+                    "rate": round(rate, 2),
+                    "annual_income": income
+                })
+        except:
             continue
 
-        mask = data.index >= purchase_date
-        portfolio_value[mask] += data.loc[mask, ticker] * shares
-        initial_value_series[mask] += shares * buy_price
+    total_sector = sum(sector_counter.values())
+    sector_allocation = {s: 100 * v / total_sector for s, v in sector_counter.items() if total_sector > 0}
 
-    # Calculate % growth over time
-    growth_series = 100.0 * (portfolio_value - initial_value_series) / initial_value_series
+    # Upcoming dividends
+    upcoming_dividends = []
+    for ticker in tickers:
+        try:
+            t = yf.Ticker(ticker)
+            info = t.info
+            div_timestamp = info.get('dividendDate')
+            if div_timestamp:
+                div_date = datetime.fromtimestamp(div_timestamp).date()
+                if div_date >= datetime.now().date():
+                    div_history = t.dividends
+                    amount = float(div_history.iloc[-1]) if not div_history.empty else None
+                    upcoming_dividends.append({
+                        "ticker": ticker,
+                        "date": div_date,
+                        "amount": amount
+                    })
+        except:
+            continue
+    upcoming_dividends.sort(key=lambda x: x["date"])
 
-    # Current values
+    investment_history = df.sort_values("date").to_dict(orient="records")
+
+    max_growth = ((portfolio_value - initial_value_series) / initial_value_series * 100).max()
+    investment_series = pd.Series(0.0, index=portfolio_value.index)
+    grouped = df.groupby('date')[['shares', 'buy_price']].apply(lambda g: (g['shares'] * g['buy_price']).sum())
+    total_investment = grouped.sum()
+    for date, amount in grouped.items():
+        if date in investment_series.index:
+            investment_series.at[date] = amount / total_investment
+    investment_scaled = investment_series * (max_growth / investment_series.max()) if investment_series.max() > 0 else investment_series
+
+    days = (portfolio_value.index - portfolio_value.index.min()).days
+    target_growth_series = pd.Series((5.0 / 365.0) * days, index=portfolio_value.index)
+
     latest_value = portfolio_value.iloc[-1]
     initial_value = initial_value_series.iloc[-1]
-    growth = growth_series.iloc[-1]
+    growth = 100.0 * (latest_value - initial_value) / initial_value
+    years_held = (datetime.now() - df['date'].min()).days / 365.0
 
-    days_held = (datetime.now() - df['date'].min()).days
-    years_held = days_held / 365.0
+    risk_flags = []
+    if any(v > 40 for v in sector_allocation.values()):
+        risk_flags.append("Over 40% concentration in one sector.")
+    if not dividend_income:
+        risk_flags.append("No dividend-generating stocks.")
 
-    # --- Compute daily investment fraction ---
-    daily_investment = df.copy()
-    daily_investment['amount'] = daily_investment['shares'] * daily_investment['buy_price']
-    daily_investment = daily_investment.groupby('date')['amount'].sum()
-
-    total_investment = daily_investment.sum()
-    investment_fraction = daily_investment / total_investment
-
-    investment_series = pd.Series(0.0, index=portfolio_value.index)
-    for date, frac in investment_fraction.items():
-        if date in investment_series.index:
-            investment_series.at[date] = frac
-
-    max_growth = growth_series.max()
-    investment_scaled = investment_series * (max_growth / investment_series.max())
-    # --- Compute daily fixed deposit-style target growth ---
-    start_date = growth_series.index.min()
-    days = (growth_series.index - start_date).days
-    target_growth_series = pd.Series((5.0 / 365.0) * days, index=growth_series.index)
-
-
-    #return growth_series, initial_value, latest_value, growth, years_held
-    #return growth_series, initial_value, latest_value, growth, years_held, investment_scaled
-    return growth_series, initial_value, latest_value, growth, years_held, investment_scaled, target_growth_series
-
-
+    return (
+        (portfolio_value - initial_value_series) / initial_value_series * 100,
+        initial_value,
+        latest_value,
+        growth,
+        years_held,
+        investment_scaled,
+        target_growth_series,
+        upcoming_dividends,
+        holdings,
+        dividend_income,
+        sum(i['annual_income'] for i in dividend_income),
+        investment_history,
+        sector_allocation,
+        TFSA_LIMIT,
+        total_contributed,
+        risk_flags
+    )
