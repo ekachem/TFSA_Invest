@@ -17,6 +17,10 @@ def get_cached_portfolio_data():
         portfolio_cache["timestamp"] = current_time
     return portfolio_cache["data"]
 
+@app.route("/ping")
+def ping():
+    return "OK", 200
+
 @app.route("/")
 def index():
     (growth_series, initial_value, latest_value, growth, years_held,
