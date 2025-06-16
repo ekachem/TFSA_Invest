@@ -43,6 +43,28 @@ def index():
                            total_contributed=round(total_contributed, 2),
                            risk_flags=risk_flags)
 
+@app.route("/plot.png")
+def plot_png():
+    (growth_series, initial_value, latest_value, growth, years_held,
+     investment_scaled, target_growth_series, *_rest) = get_cached_portfolio_data()
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    growth_series.plot(ax=ax, label="Growth (%)", linewidth=2)
+    target_growth_series.plot(ax=ax, color='red', linestyle='--', label='5% FD Target')
+    ax.bar(investment_scaled.index, investment_scaled.values, width=1,
+           alpha=0.3, color='orange', label='Investment Activity (scaled)')
+
+    ax.set_xlabel("Date")
+    ax.set_title("TFSA Portfolio Growth Over Time")
+    ax.set_ylabel("Growth (%)")
+    ax.grid(True)
+    ax.legend()
+
+    buf = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    return send_file(buf, mimetype="image/png")
 
 if __name__ == "__main__":
     app.run()
